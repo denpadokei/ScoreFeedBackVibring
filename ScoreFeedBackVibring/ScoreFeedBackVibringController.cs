@@ -6,7 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
-using UnityEngine.XR;
+using UnityEngine;
 using Zenject;
 
 namespace ScoreFeedBackVibring
@@ -34,31 +34,24 @@ namespace ScoreFeedBackVibring
         public void Initialize()
         {
             this._beatmapObjectManager.noteWasCutEvent += this.BeatmapObjectManager_noteWasCutEvent;
-            this._normalPreset = this._hapticFeedbackController.GetField<HapticPresetSO, HapticFeedbackController>("_normalPreset");
-            var dic = this._hapticFeedbackController.GetField<Dictionary<XRNode, Dictionary<object, HapticFeedbackController.RumbleData>>, HapticFeedbackController>("_rumblesByNode");
             var presetDic = new Dictionary<VibroParam, HapticPresetSO>();
-            foreach (var rumbleDataDic in dic.Values) {
-                foreach (var item in PluginConfig.Instance.Params) {
-                    var priset = new HapticPresetSO()
-                    {
-                        _duration = item.Duration,
-                        _strength = item.Strength,
-                        _frequency = item.Frequency,
-                        _continuous = false
-                    };
-                    var rumbleData = new HapticFeedbackController.RumbleData()
-                    {
-                        active = false,
-                        continuous = false,
-                        strength = item.Strength,
-                        frequency = item.Frequency,
-                        endTime = 0
-                    };
-                    rumbleDataDic.Add(priset, rumbleData);
-                    presetDic.Add(item, priset);
+            foreach (var item in PluginConfig.Instance.Params) {
+                try {
+                    var priset = ScriptableObject.CreateInstance(typeof(HapticPresetSO)) as HapticPresetSO;
+                    priset._duration = item.Duration;
+                    priset._strength = item.Strength;
+                    priset._frequency = item.Frequency;
+                    priset._continuous = false;
+                    if (!presetDic.ContainsKey(item)) {
+                        presetDic.Add(item, priset);
+                    }
+                }
+                catch (Exception e) {
+                    Plugin.Log.Error(e);
                 }
             }
             this._presets = new ReadOnlyDictionary<VibroParam, HapticPresetSO>(presetDic);
+            Plugin.Log.Info("Initialized");
         }
 
         [AffinityPatch(typeof(NoteCutHapticEffect), nameof(NoteCutHapticEffect.HitNote), argumentTypes: new Type[] { typeof(SaberType), typeof(NoteCutHapticEffect.Type) })]
@@ -80,30 +73,32 @@ namespace ScoreFeedBackVibring
 
         private void Vibring(NoteData.GameplayType noteType, in NoteCutInfo noteCutInfo)
         {
-            switch (noteType) {
-                case NoteData.GameplayType.Normal:
-                    var distanceToCenter = noteCutInfo.cutDistanceToCenter;
-                    foreach (var priset in PluginConfig.Instance.Params.OrderBy(x => x.MaxDistanceToCenter)) {
-                        if (priset.MaxDistanceToCenter < distanceToCenter) {
-                            continue;
+            try {
+                switch (noteType) {
+                    case NoteData.GameplayType.Normal:
+                        var distanceToCenter = noteCutInfo.cutDistanceToCenter;
+                        foreach (var preset in PluginConfig.Instance.Params.OrderBy(x => x.MaxDistanceToCenter)) {
+                            if (preset.MaxDistanceToCenter < distanceToCenter) {
+                                continue;
+                            }
+                            if (this._presets.TryGetValue(preset, out var hapticPresetSO)) {
+                                this._hapticFeedbackController.PlayHapticFeedback(noteCutInfo.saberType.Node(), hapticPresetSO);
+                                return;
+                            }
                         }
-                        if (this._presets.TryGetValue(priset, out var hapticPresetSO)) {
-                            this._hapticFeedbackController.PlayHapticFeedback(noteCutInfo.saberType.Node(), hapticPresetSO);
-                            return;
-                        }
-                    }
-                    break;
-                case NoteData.GameplayType.Bomb:
-                    this._hapticFeedbackController.PlayHapticFeedback(noteCutInfo.saberType.Node(), this._normalPreset);
-                    break;
-                case NoteData.GameplayType.BurstSliderHead:
-                case NoteData.GameplayType.BurstSliderElement:
-                case NoteData.GameplayType.BurstSliderElementFill:
-                default:
-                    break;
+                        break;
+                    case NoteData.GameplayType.Bomb:
+                        this._hapticFeedbackController.PlayHapticFeedback(noteCutInfo.saberType.Node(), this._normalPreset);
+                        break;
+                    case NoteData.GameplayType.BurstSliderHead:
+                    case NoteData.GameplayType.BurstSliderElement:
+                    case NoteData.GameplayType.BurstSliderElementFill:
+                    default:
+                        break;
+                }
             }
-            if (noteType != NoteData.GameplayType.Normal && noteType != NoteData.GameplayType.Bomb) {
-                return;
+            catch (Exception e) {
+                Plugin.Log.Error(e);
             }
         }
         #endregion
@@ -119,11 +114,13 @@ namespace ScoreFeedBackVibring
         //ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*
         #region // 構築・破棄
         [Inject]
-        public void Constractor(HapticFeedbackController hapticFeedbackController, BeatmapObjectManager beatmapObjectManager, IAudioTimeSource audioTimeSource)
+        public void Constractor(HapticFeedbackController hapticFeedbackController, BeatmapObjectManager beatmapObjectManager, IAudioTimeSource audioTimeSource, NoteCutCoreEffectsSpawner noteCutCoreEffectsSpawner)
         {
             this._hapticFeedbackController = hapticFeedbackController;
             this._beatmapObjectManager = beatmapObjectManager;
             this._audioTimeSource = audioTimeSource;
+            var noteCutHapticEffect = noteCutCoreEffectsSpawner.GetField<NoteCutHapticEffect, NoteCutCoreEffectsSpawner>("_noteCutHapticEffect");
+            this._normalPreset = noteCutHapticEffect.GetField<HapticPresetSO, NoteCutHapticEffect>("_normalPreset");
         }
 
         protected virtual void Dispose(bool disposing)
@@ -132,6 +129,9 @@ namespace ScoreFeedBackVibring
                 if (disposing) {
                     // TODO: マネージド状態を破棄します (マネージド オブジェクト)
                     this._beatmapObjectManager.noteWasCutEvent -= this.BeatmapObjectManager_noteWasCutEvent;
+                    foreach (var item in this._presets.Values) {
+                        GameObject.Destroy(item);
+                    }
                 }
 
                 // TODO: アンマネージド リソース (アンマネージド オブジェクト) を解放し、ファイナライザーをオーバーライドします
