@@ -1,0 +1,2 @@
+# ScoreFeedBackVibring
+真ん中切ったらめっちゃ震えるMod
