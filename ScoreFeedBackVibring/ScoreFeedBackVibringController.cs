@@ -34,6 +34,7 @@ namespace ScoreFeedBackVibring
         public void Initialize()
         {
             _beatmapObjectManager.noteWasCutEvent += BeatmapObjectManager_noteWasCutEvent;
+            _normalPreset = _hapticFeedbackController.GetField<HapticPresetSO, HapticFeedbackController>("_normalPreset");
             var dic = _hapticFeedbackController.GetField<Dictionary<XRNode, Dictionary<object, HapticFeedbackController.RumbleData>>, HapticFeedbackController>("_rumblesByNode");
             var presetDic = new Dictionary<VibroParam, HapticPresetSO>();
             foreach (var rumbleDataDic in dic.Values) {
@@ -71,24 +72,40 @@ namespace ScoreFeedBackVibring
         #region // プライベートメソッド
         private void BeatmapObjectManager_noteWasCutEvent(NoteController noteController, in NoteCutInfo noteCutInfo)
         {
+            if (noteController.noteData.time + 0.5f < this._audioTimeSource.songTime) {
+                return;
+            }
             Vibring(noteController.noteData.gameplayType, noteCutInfo);
         }
 
         private void Vibring(NoteData.GameplayType noteType, in NoteCutInfo noteCutInfo)
         {
-            if (noteType != NoteData.GameplayType.Normal) {
+            switch (noteType) {
+                case NoteData.GameplayType.Normal:
+                    var distanceToCenter = noteCutInfo.cutDistanceToCenter;
+                    foreach (var priset in PluginConfig.Instance.Params.OrderBy(x => x.MaxDistanceToCenter)) {
+                        if (priset.MaxDistanceToCenter < distanceToCenter) {
+                            continue;
+                        }
+                        if (_presets.TryGetValue(priset, out var hapticPresetSO)) {
+                            _hapticFeedbackController.PlayHapticFeedback(noteCutInfo.saberType.Node(), hapticPresetSO);
+                            return;
+                        }
+                    }
+                    break;
+                case NoteData.GameplayType.Bomb:
+                    _hapticFeedbackController.PlayHapticFeedback(noteCutInfo.saberType.Node(), _normalPreset);
+                    break;
+                case NoteData.GameplayType.BurstSliderHead:
+                case NoteData.GameplayType.BurstSliderElement:
+                case NoteData.GameplayType.BurstSliderElementFill:
+                default:
+                    break;
+            }
+            if (noteType != NoteData.GameplayType.Normal && noteType != NoteData.GameplayType.Bomb) {
                 return;
             }
-            var distanceToCenter = noteCutInfo.cutDistanceToCenter;
-            foreach (var priset in PluginConfig.Instance.Params.OrderBy(x => x.MaxDistanceToCenter)) {
-                if (priset.MaxDistanceToCenter < distanceToCenter) {
-                    continue;
-                }
-                if (_presets.TryGetValue(priset, out var hapticPresetSO)) {
-                    _hapticFeedbackController.PlayHapticFeedback(noteCutInfo.saberType.Node(), hapticPresetSO);
-                    return;
-                }
-            }
+            
         }
         #endregion
         //ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*
@@ -97,14 +114,17 @@ namespace ScoreFeedBackVibring
         private BeatmapObjectManager _beatmapObjectManager;
         private bool _disposedValue;
         private ReadOnlyDictionary<VibroParam, HapticPresetSO> _presets;
+        private HapticPresetSO _normalPreset;
+        private IAudioTimeSource _audioTimeSource;
         #endregion
         //ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*
         #region // 構築・破棄
         [Inject]
-        public void Constractor(HapticFeedbackController hapticFeedbackController, BeatmapObjectManager beatmapObjectManager)
+        public void Constractor(HapticFeedbackController hapticFeedbackController, BeatmapObjectManager beatmapObjectManager, IAudioTimeSource audioTimeSource)
         {
             _hapticFeedbackController = hapticFeedbackController;
             _beatmapObjectManager = beatmapObjectManager;
+            _audioTimeSource = audioTimeSource;
         }
 
         protected virtual void Dispose(bool disposing)
