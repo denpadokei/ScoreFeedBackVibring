@@ -22,7 +22,7 @@ namespace ScoreFeedBackVibring.Configuration
             {
                 new VibroParam()
                 {
-                    MaxDistanceToCenter = 0.01f,
+                    MaxDistanceToCenter = 0.02f,
                     Duration = 0.13f,
                     Strength = 1f,
                     Frequency = 0.5f
