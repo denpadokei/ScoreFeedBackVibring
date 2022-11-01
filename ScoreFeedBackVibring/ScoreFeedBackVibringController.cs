@@ -121,6 +121,10 @@ namespace ScoreFeedBackVibring
             this._audioTimeSource = audioTimeSource;
             var noteCutHapticEffect = noteCutCoreEffectsSpawner.GetField<NoteCutHapticEffect, NoteCutCoreEffectsSpawner>("_noteCutHapticEffect");
             this._normalPreset = noteCutHapticEffect.GetField<HapticPresetSO, NoteCutHapticEffect>("_normalPreset");
+
+#if DEBUG
+            Plugin.Log.Debug($"normalPreset param _duration:{this._normalPreset._duration}, _strength:{this._normalPreset._strength}, _frequency:{this._normalPreset._frequency}, _continuous:{this._normalPreset._continuous}");
+#endif
         }
 
         protected virtual void Dispose(bool disposing)
