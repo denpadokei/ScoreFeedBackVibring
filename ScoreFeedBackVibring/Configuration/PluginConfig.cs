@@ -41,7 +41,7 @@ namespace ScoreFeedBackVibring.Configuration
                     Frequency = 0.2f
                 }
             };
-            Params.AddRange(list);
+            this.Params.AddRange(list);
         }
 
         /// <summary>

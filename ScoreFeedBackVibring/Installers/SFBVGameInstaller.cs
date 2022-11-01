@@ -6,7 +6,7 @@ namespace ScoreFeedBackVibring.Installers
     {
         public override void InstallBindings()
         {
-            Container.BindInterfacesAndSelfTo<ScoreFeedBackVibringController>().AsCached();
+            this.Container.BindInterfacesAndSelfTo<ScoreFeedBackVibringController>().AsCached();
         }
     }
 }
