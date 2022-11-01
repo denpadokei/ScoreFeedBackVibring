@@ -30,8 +30,8 @@ namespace ScoreFeedBackVibring
             Plugin.Log?.Debug("Logger initialized.");
             Configuration.PluginConfig.Instance = conf.Generated<Configuration.PluginConfig>();
             Plugin.Log?.Debug("Config loaded");
+            zenjector.Install<SFBVMenuInstaller>(Location.Menu);
             zenjector.Install<SFBVGameInstaller>(Location.Player);
-
         }
     }
 }

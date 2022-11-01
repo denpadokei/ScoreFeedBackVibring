@@ -10,6 +10,7 @@ namespace ScoreFeedBackVibring.Configuration
     internal class PluginConfig
     {
         public static PluginConfig Instance { get; set; }
+        public virtual bool Enable { get; set; } = true;
 
         [UseConverter(typeof(ListConverter<VibroParam>))]
         [NonNullable]
